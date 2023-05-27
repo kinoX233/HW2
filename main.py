@@ -20,6 +20,9 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
+import pandas as pd
+from torchvision.io import read_image
+from PIL import Image
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -144,6 +147,9 @@ def main_worker(gpu, ngpus_per_node, args):
         print("=> creating model '{}'".format(args.arch))
         model = models.__dict__[args.arch]()
 
+    #?change output to 200
+    model.fc = nn.Linear(512,200)
+
     if not torch.cuda.is_available() and not torch.backends.mps.is_available():
         print('using CPU, this will be slow')
     elif args.distributed:
@@ -222,31 +228,29 @@ def main_worker(gpu, ngpus_per_node, args):
             print("=> no checkpoint found at '{}'".format(args.resume))
 
 
-    # Data loading code
-    if args.dummy:#todo
+    # Data loading code  
+    if args.dummy:
         print("=> Dummy data is used!")
         train_dataset = datasets.FakeData(1281167, (3, 224, 224), 1000, transforms.ToTensor())
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
     else:
         traindir = os.path.join(args.data, 'train')
-        valdir = os.path.join(args.data, 'val')
+        valdir = os.path.join(args.data, 'val_new')
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
-        train_dataset = datasets.ImageFolder(
+    train_dataset = datasets.ImageFolder(
             traindir,
             transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(),
+                transforms.Resize(224),
                 transforms.ToTensor(),
                 normalize,
             ]))
-
-        val_dataset = datasets.ImageFolder(
+    
+    val_dataset = datasets.ImageFolder(
             valdir,
             transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+                transforms.Resize(224),
                 transforms.ToTensor(),
                 normalize,
             ]))
