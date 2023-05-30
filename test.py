@@ -36,7 +36,7 @@ with open(annotations_path,"r") as an:
             for wnids_num, line_wnids in enumerate(lines_wnids):
                 if(img_type == line_wnids.rstrip("\n")):
                     label = wnids_num
-                    label_path = os.path.join(val_new,str(label))
+                    label_path = os.path.join(val_new,str(label+1))
 
 
                     if(not os.path.exists(label_path)):

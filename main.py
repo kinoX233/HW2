@@ -22,7 +22,7 @@ from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
 import pandas as pd
 from torchvision.io import read_image
-from PIL import Image
+from torch.utils.tensorboard import SummaryWriter
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -149,7 +149,8 @@ def main_worker(gpu, ngpus_per_node, args):
 
     #?change output to 200
     model.fc = nn.Linear(512,200)
-
+    model.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
+    
     if not torch.cuda.is_available() and not torch.backends.mps.is_available():
         print('using CPU, this will be slow')
     elif args.distributed:
@@ -235,14 +236,16 @@ def main_worker(gpu, ngpus_per_node, args):
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
     else:
         traindir = os.path.join(args.data, 'train')
-        valdir = os.path.join(args.data, 'val_new')
+        valdir = os.path.join(args.data, 'val_new_2')
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
     train_dataset = datasets.ImageFolder(
             traindir,
             transforms.Compose([
-                transforms.Resize(224),
+                #transforms.RandomResizedCrop(64),
+                #transforms.RandomHorizontalFlip(),
+                transforms.Resize(64),
                 transforms.ToTensor(),
                 normalize,
             ]))
@@ -250,7 +253,8 @@ def main_worker(gpu, ngpus_per_node, args):
     val_dataset = datasets.ImageFolder(
             valdir,
             transforms.Compose([
-                transforms.Resize(224),
+                #transforms.CenterCrop(64),
+                transforms.Resize(64),
                 transforms.ToTensor(),
                 normalize,
             ]))
@@ -312,7 +316,10 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         len(train_loader),
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
-
+    
+    #tensorboard
+    writer = SummaryWriter()
+    
     # switch to train mode
     model.train()
 
@@ -335,6 +342,9 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
 
+        writer.add_scalar('loss',losses.val,global_step=epoch * len(train_loader) + i)
+        writer.add_scalar('top5',top5.val,global_step=epoch * len(train_loader) + i)
+
         # compute gradient and do SGD step
         optimizer.zero_grad()
         loss.backward()
@@ -347,10 +357,15 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args):
         if i % args.print_freq == 0:
             progress.display(i + 1)
 
+    writer.close()
+
 
 def validate(val_loader, model, criterion, args):
 
     def run_validate(loader, base_progress=0):
+        #tensorboard
+        writer = SummaryWriter()
+
         with torch.no_grad():
             end = time.time()
             for i, (images, target) in enumerate(loader):
@@ -373,12 +388,17 @@ def validate(val_loader, model, criterion, args):
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
 
+                writer.add_scalar('val_loss',losses.val,global_step=len(loader) + i)
+                writer.add_scalar('val_top5',top5.val,global_step=len(loader) + i)
+
                 # measure elapsed time
                 batch_time.update(time.time() - end)
                 end = time.time()
 
                 if i % args.print_freq == 0:
                     progress.display(i + 1)
+
+        writer.close()
 
     batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
     losses = AverageMeter('Loss', ':.4e', Summary.NONE)

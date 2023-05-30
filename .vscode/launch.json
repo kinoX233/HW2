@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            "args": ["--b", "128", "--a", "resnet18","-e", "../tiny-imagenet-200"],
+            "args": [ "--a", "resnet18","../tiny-imagenet-200"],//"--lr","0.2"
             "justMyCode": true
-        }
+        }//"-e""128","--b","--evaluate", "--resume","./checkpoint.pth.tar"
     ]
 }
